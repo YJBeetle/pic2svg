@@ -31,12 +31,17 @@ public:
 
 	void openPic(string path)
 	{
-		pic = imread(path, IMREAD_UNCHANGED);
-		if (pic.channels() == 4)
+		auto picRead = imread(path, IMREAD_UNCHANGED);
+		if (picRead.channels() == 3)
+			cvtColor(picRead, pic, CV_BGR2BGRA);
+		else
+		{
+			pic = picRead;
 			for (int y = 0; y < pic.rows; y++)
 				for (int x = 0; x < pic.cols; x++)
-					if (pic.at<Vec4b>(y, x)[3] == 0)
+					if (pic.at<Vec4b>(y, x)[3] == 0) // Alpha 为 0 的像素设置为黑色
 						pic.at<Vec4b>(y, x)[0] = pic.at<Vec4b>(y, x)[1] = pic.at<Vec4b>(y, x)[2] = 0;
+		}
 	}
 
 	void saveTo(string path)
@@ -46,35 +51,24 @@ public:
 
 	void limitColor(int colorQuantity)
 	{
-		Mat samples(pic.rows * pic.cols, pic.channels(), CV_32F);
+		Mat samples(pic.rows * pic.cols, 4, CV_32F);
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
-				for (int z = 0; z < pic.channels(); z++)
-					samples.at<float>(y + x * pic.rows, z) = pic.channels() == 3 ? pic.at<Vec3b>(y, x)[z] : pic.at<Vec4b>(y, x)[z];
+				for (int z = 0; z < 4; z++)
+					samples.at<float>(y + x * pic.rows, z) = pic.at<Vec4b>(y, x)[z];
 
-		int clusterCount = colorQuantity;
 		Mat labels;
-		int attempts = 5;
 		Mat centers;
-		kmeans(samples, clusterCount, labels, TermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers);
+		kmeans(samples, colorQuantity, labels, TermCriteria(TermCriteria::COUNT | TermCriteria::EPS, 10000, 0.0001), 5 /* attempts */, KMEANS_PP_CENTERS, centers);
 
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
 				int cluster_idx = labels.at<int>(y + x * pic.rows, 0);
-				if (pic.channels() == 3)
-				{
-					pic.at<Vec3b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
-					pic.at<Vec3b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
-					pic.at<Vec3b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
-				}
-				else if (pic.channels() == 4)
-				{
-					pic.at<Vec4b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
-					pic.at<Vec4b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
-					pic.at<Vec4b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
-					pic.at<Vec4b>(y, x)[3] = centers.at<float>(cluster_idx, 3);
-				}
+				pic.at<Vec4b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
+				pic.at<Vec4b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
+				pic.at<Vec4b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
+				pic.at<Vec4b>(y, x)[3] = centers.at<float>(cluster_idx, 3);
 			}
 	}
 
@@ -93,9 +87,9 @@ public:
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				if (pic.channels() == 3)
+				auto p = pic.at<Vec4b>(y, x);
+				if (p[3])
 				{
-					auto p = pic.at<Vec3b>(y, x);
 					color[0] = p[2] >> 4;
 					color[1] = p[2] & 0xF;
 					color[2] = p[1] >> 4;
@@ -112,33 +106,9 @@ public:
 					svg << "x=\"" << x << "\" ";
 					svg << "y=\"" << y << "\" ";
 					svg << "fill=\"#" << color << "\" ";
+					if (p[3] != 0xFF)
+						svg << "opacity=\"" << (float)p[3] / 0xFF << "\" ";
 					svg << "/>";
-				}
-				else if (pic.channels() == 4)
-				{
-					auto p = pic.at<Vec4b>(y, x);
-					if (p[3])
-					{
-						color[0] = p[2] >> 4;
-						color[1] = p[2] & 0xF;
-						color[2] = p[1] >> 4;
-						color[3] = p[1] & 0xF;
-						color[4] = p[0] >> 4;
-						color[5] = p[0] & 0xF;
-						color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
-						color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
-						color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
-						color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
-						color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
-						color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
-						svg << R"(<rect width="1" height="1" )";
-						svg << "x=\"" << x << "\" ";
-						svg << "y=\"" << y << "\" ";
-						svg << "fill=\"#" << color << "\" ";
-						if (p[3] != 0xFF)
-							svg << "opacity=\"" << (float)p[3] / 0xFF << "\" ";
-						svg << "/>";
-					}
 				}
 			}
 
