@@ -3,35 +3,51 @@
 #include <string>
 #include <cstring>
 #include <png.h>
+#include <getopt.h>
 
 using namespace std;
+
+void help()
+{
+	cerr << "Usage: png2svg <PNG_FILE> <SVG_FILE>" << '\n';
+	exit(1);
+}
 
 int main(int argC, char **argV)
 {
 	string pngPath;
 	string svgPath;
+	int limitColorSum = 10;
 
-	if (argC == 2)
+	int ch;
+	while ((ch = getopt(argC, argV, "c:")) != -1)
+		switch (ch)
+		{
+		case 'c':
+			limitColorSum = stoi(optarg);
+			break;
+		case '?':
+		default:
+			help();
+		}
+
+	for (int index = optind; index < argC; index++)
+		if (pngPath.empty())
+			pngPath = argV[index];
+		else if (svgPath.empty())
+			svgPath = argV[index];
+
+	if (pngPath.empty())
+		help();
+
+	if (svgPath.empty())
 	{
-		pngPath = argV[1];
-		char *dotCut = argV[1] + strlen(argV[1]) - 4;
-		if (strcmp(dotCut, ".png") == 0)
-			*dotCut = 0;
-		svgPath = string(argV[1]) + ".svg";
-	}
-	else if (argC == 3)
-	{
-		pngPath = argV[1];
-		svgPath = argV[2];
-	}
-	else
-	{
-		cout << "Usage: png2svg <PNG_FILE> <SVG_FILE>" << '\n';
-		exit(1);
+		svgPath = pngPath.substr(0, pngPath.rfind(".")) + ".svg";
 	}
 
 	cout << "png: " << pngPath << '\n';
 	cout << "svg: " << svgPath << '\n';
+	cout << "limitColorSum: " << limitColorSum << '\n';
 
 	png_image image;
 	memset(&image, 0, (sizeof image));
