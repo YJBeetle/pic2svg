@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <unordered_set>
 #include <unordered_map>
+#include <list>
+#include <vector>
 #include <cmath>
 #include <opencv2/opencv.hpp>
 #include <getopt.h>
@@ -77,19 +79,117 @@ public:
 		fstream svg;
 		svg.open(svgPath, fstream::out);
 
-		svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
-			<< R"(<!-- Generator: pic2svg -->)";
+		// svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
+		// 	<< R"(<!-- Generator: pic2svg -->)";
 
-		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)";
+		// svg << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
+		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
+		svg << "<title>pic2svg</title>" << endl;
 
+		struct Point
+		{
+			int x;
+			int y;
+		};
+		const Point pointAddByDirection[8] = {
+			{1, 0},
+			{1, 1},
+			{0, 1},
+			{-1, 1},
+			{-1, 0},
+			{-1, -1},
+			{0, -1},
+			{1, -1},
+		}; // 打表
+		const Point pointAddByDirection2[8] = {
+			{1, 0},
+			{1, 1},
+			{0, 1},
+			{-1, 1},
+			{-1, 0},
+			{-1, -1},
+			{0, -1},
+			{1, -1},
+		}; // 打表
+
+		bool *mask = new bool[pic.cols * pic.rows]{};
 		char color[7];
 		color[6] = 0;
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
 				auto p = pic.at<Vec4b>(y, x);
-				if (p[3])
+				if (p[3] &&
+					mask[y * pic.cols + x] == false && // 未标记
+					(pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x + 1) ||
+					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y + 1, x) ||
+					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x - 1) ||
+					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y - 1, x)) // 任意一方是边缘
+				)
 				{
+					int xx = x;
+					int yy = y;
+
+					vector<Point> points;
+					points.push_back({x : x, y : y}); // 添加第一个点
+
+					uint8_t lastDirection = 0;
+
+					for (size_t iiiiii = 0; iiiiii < 1000; iiiiii++)
+					// while (1)
+					{
+						/*
+							  7      0
+							  ⬇      ⬇
+							0b00000000
+							 ___________
+							| 5 | 6 | 7 |
+							|---|---|---|
+							| 4 | X | 0 |
+							|---|---|---|
+							| 3 | 2 | 1 |
+							 -----------
+						*/
+						mask[yy * pic.cols + xx] = true;
+
+						uint8_t t = 0b00000000;
+						for (uint8_t i = 0; i < 8; i++)
+						{
+							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
+						}
+
+						for (uint8_t addDirection = 0; addDirection < 8; addDirection++)
+						{
+							uint8_t endDirection = lastDirection + addDirection;
+							uint8_t direction = endDirection >= 8 ? endDirection - 8 : endDirection;
+
+							if ((t & (1 << direction)) == (1 << direction)) // 下一个方向上有东西
+							{
+								// 添加喵点
+								for (uint8_t nowDirection = lastDirection; nowDirection <= endDirection; nowDirection++)
+								{
+									uint8_t ddirection = nowDirection >= 8 ? nowDirection - 8 : nowDirection;
+									points.push_back({x : xx + pointAddByDirection2[ddirection].x, y : yy + pointAddByDirection2[ddirection].y});
+									// 	points.push_back({x : xx + 1, y : yy});		// 添加当前点的右上角坐标
+									// 	points.push_back({x : xx + 1, y : yy + 1}); // 添加当前点的右下角坐标
+									// 	points.push_back({x : xx, y : yy + 1});		// 添加当前点的左下角坐标
+									// 	points.push_back({x : xx, y : yy});			// 添加当前点的左上角坐标
+									// 	points.push_back({x : xx - 1, y : yy});		//
+								}
+
+								// 下一个点坐标
+								xx += pointAddByDirection[direction].x;
+								yy += pointAddByDirection[direction].y;
+
+								break;
+							}
+						}
+
+						// if ((xx == x && yy == y) || mask[yy * pic.cols + xx])
+						if (xx == x && yy == y)
+							break;
+					}
+
 					color[0] = p[2] >> 4;
 					color[1] = p[2] & 0xF;
 					color[2] = p[1] >> 4;
@@ -102,13 +202,16 @@ public:
 					color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
 					color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
 					color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
-					svg << R"(<rect width="1" height="1" )";
-					svg << "x=\"" << x << "\" ";
-					svg << "y=\"" << y << "\" ";
-					svg << "fill=\"#" << color << "\" ";
+
+					svg << "<polygon";
+					svg << " points=\"";
+					for (auto point : points)
+						svg << point.x << "," << point.y << " ";
+					svg << "\"";
+					svg << " fill=\"#" << color << "\"";
 					if (p[3] != 0xFF)
-						svg << "opacity=\"" << (float)p[3] / 0xFF << "\" ";
-					svg << "/>";
+						svg << " opacity=\"" << (float)p[3] / 0xFF << "\"";
+					svg << "/>" << endl;
 				}
 			}
 
