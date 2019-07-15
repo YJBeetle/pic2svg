@@ -2,72 +2,129 @@
 #include <fstream>
 #include <string>
 #include <cstring>
-#include <png.h>
+#include <cstdint>
+#include <unordered_set>
+#include <unordered_map>
+#include <cmath>
+#include <opencv2/opencv.hpp>
+#include <getopt.h>
 
 using namespace std;
+using namespace cv;
 
-int main(int argC, char **argV)
+void help()
 {
-	string pngPath;
-	string svgPath;
+	cerr << "Usage: pic2svg <PICTURE_FILE> <SVG_FILE>" << '\n';
+	exit(1);
+}
 
-	if (argC == 2)
+class SvgMake
+{
+public:
+	SvgMake()
 	{
-		pngPath = argV[1];
-		char *dotCut = argV[1] + strlen(argV[1]) - 4;
-		if (strcmp(dotCut, ".png") == 0)
-			*dotCut = 0;
-		svgPath = string(argV[1]) + ".svg";
-	}
-	else if (argC == 3)
-	{
-		pngPath = argV[1];
-		svgPath = argV[2];
-	}
-	else
-	{
-		cout << "Usage: png2svg <PNG_FILE> <SVG_FILE>" << '\n';
-		exit(1);
 	}
 
-	cout << "png: " << pngPath << '\n';
-	cout << "svg: " << svgPath << '\n';
-
-	png_image image;
-	memset(&image, 0, (sizeof image));
-	image.version = PNG_IMAGE_VERSION;
-
-	if (png_image_begin_read_from_file(&image, pngPath.c_str()) != 0)
+	~SvgMake()
 	{
-		image.format = PNG_FORMAT_RGBA;
-		png_bytep buffer = (png_bytep)malloc(PNG_IMAGE_SIZE(image));
+	}
 
-		if (buffer != nullptr && png_image_finish_read(&image, NULL /*background*/, buffer, 0 /*row_stride*/, NULL /*colormap*/) != 0)
-		{
-			fstream svg;
-			svg.open(svgPath, fstream::out);
+	void openPic(string path)
+	{
+		pic = imread(path, IMREAD_UNCHANGED);
+		if (pic.channels() == 4)
+			for (int y = 0; y < pic.rows; y++)
+				for (int x = 0; x < pic.cols; x++)
+					if (pic.at<Vec4b>(y, x)[3] == 0)
+						pic.at<Vec4b>(y, x)[0] = pic.at<Vec4b>(y, x)[1] = pic.at<Vec4b>(y, x)[2] = 0;
+	}
 
-			svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
-				<< R"(<!-- Generator: png2svg by pixel  -->)";
+	void saveTo(string path)
+	{
+		imwrite(path, pic);
+	}
 
-			svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << image.width << ' ' << image.height << R"(">)";
+	void limitColor(int colorQuantity)
+	{
+		Mat samples(pic.rows * pic.cols, pic.channels(), CV_32F);
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
+				for (int z = 0; z < pic.channels(); z++)
+					samples.at<float>(y + x * pic.rows, z) = pic.channels() == 3 ? pic.at<Vec3b>(y, x)[z] : pic.at<Vec4b>(y, x)[z];
 
-			char color[7];
-			color[6] = 0;
-			for (png_uint_32 y = 0; y < image.height; y++)
+		int clusterCount = colorQuantity;
+		Mat labels;
+		int attempts = 5;
+		Mat centers;
+		kmeans(samples, clusterCount, labels, TermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers);
+
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
 			{
-				for (png_uint_32 x = 0; x < image.width; x++)
+				int cluster_idx = labels.at<int>(y + x * pic.rows, 0);
+				if (pic.channels() == 3)
 				{
-					auto p = buffer + (image.width * 4 * y) + x * 4;
+					pic.at<Vec3b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
+					pic.at<Vec3b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
+					pic.at<Vec3b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
+				}
+				else if (pic.channels() == 4)
+				{
+					pic.at<Vec4b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
+					pic.at<Vec4b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
+					pic.at<Vec4b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
+					pic.at<Vec4b>(y, x)[3] = centers.at<float>(cluster_idx, 3);
+				}
+			}
+	}
 
+	void saveToSvgByPixel(string svgPath)
+	{
+		fstream svg;
+		svg.open(svgPath, fstream::out);
+
+		svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
+			<< R"(<!-- Generator: pic2svg -->)";
+
+		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)";
+
+		char color[7];
+		color[6] = 0;
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
+			{
+				if (pic.channels() == 3)
+				{
+					auto p = pic.at<Vec3b>(y, x);
+					color[0] = p[2] >> 4;
+					color[1] = p[2] & 0xF;
+					color[2] = p[1] >> 4;
+					color[3] = p[1] & 0xF;
+					color[4] = p[0] >> 4;
+					color[5] = p[0] & 0xF;
+					color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
+					color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
+					color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
+					color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
+					color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
+					color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
+					svg << R"(<rect width="1" height="1" )";
+					svg << "x=\"" << x << "\" ";
+					svg << "y=\"" << y << "\" ";
+					svg << "fill=\"#" << color << "\" ";
+					svg << "/>";
+				}
+				else if (pic.channels() == 4)
+				{
+					auto p = pic.at<Vec4b>(y, x);
 					if (p[3])
 					{
-						color[0] = p[0] >> 4;
-						color[1] = p[0] & 0xF;
+						color[0] = p[2] >> 4;
+						color[1] = p[2] & 0xF;
 						color[2] = p[1] >> 4;
 						color[3] = p[1] & 0xF;
-						color[4] = p[2] >> 4;
-						color[5] = p[2] & 0xF;
+						color[4] = p[0] >> 4;
+						color[5] = p[0] & 0xF;
 						color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
 						color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
 						color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
@@ -85,24 +142,67 @@ int main(int argC, char **argV)
 				}
 			}
 
-			svg << R"(</svg>)";
+		svg << R"(</svg>)";
 
-			svg.close();
-			png_image_free(&image);
-			free(buffer);
-
-			cout << "done." << endl;
-		}
-		else
-		{
-			if (buffer == nullptr)
-				png_image_free(&image);
-			else
-				free(buffer);
-
-			cerr << "Read PNG file error." << endl;
-		}
+		svg.close();
 	}
-	else
-		cerr << "Open PNG file error." << endl;
+
+private:
+	Mat pic;
+};
+
+int main(int argC, char **argV)
+{
+	string picPath;
+	string svgPath;
+	int limitColorQuantity = 32;
+
+	int ch;
+	while ((ch = getopt(argC, argV, "c:")) != -1)
+		switch (ch)
+		{
+		case 'c':
+			limitColorQuantity = stoi(optarg);
+			break;
+		case '?':
+		default:
+			help();
+		}
+
+	for (int index = optind; index < argC; index++)
+		if (picPath.empty())
+			picPath = argV[index];
+		else if (svgPath.empty())
+			svgPath = argV[index];
+
+	if (picPath.empty())
+		help();
+
+	if (svgPath.empty())
+	{
+		svgPath = picPath.substr(0, picPath.rfind(".")) + ".svg";
+	}
+
+	cout << "==========" << endl
+		 << "pic: " << picPath << endl
+		 << "svg: " << svgPath << endl
+		 << "limitColorQuantity: " << limitColorQuantity << endl
+		 << "==========" << endl;
+
+	SvgMake svgMake;
+
+	cout << "Reading picture..." << endl;
+	svgMake.openPic(picPath);
+
+	cout << "Limit Color..." << endl;
+	svgMake.limitColor(limitColorQuantity);
+
+#ifdef DEBUG
+	string debug1pic = picPath + ".debug1.png";
+	cout << "[DEBUG] save to: " << debug1pic << endl;
+	svgMake.saveTo(debug1pic);
+#endif
+
+	cout << "saveToSvgByPixel..." << endl;
+	svgMake.saveToSvgByPixel(svgPath);
 }
