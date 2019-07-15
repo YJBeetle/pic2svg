@@ -32,6 +32,11 @@ public:
 	void openPic(string path)
 	{
 		pic = imread(path, IMREAD_UNCHANGED);
+		if (pic.channels() == 4)
+			for (int y = 0; y < pic.rows; y++)
+				for (int x = 0; x < pic.cols; x++)
+					if (pic.at<Vec4b>(y, x)[3] == 0)
+						pic.at<Vec4b>(y, x)[0] = pic.at<Vec4b>(y, x)[1] = pic.at<Vec4b>(y, x)[2] = 0;
 	}
 
 	void saveTo(string path)
@@ -178,9 +183,11 @@ int main(int argC, char **argV)
 		svgPath = picPath.substr(0, picPath.rfind(".")) + ".svg";
 	}
 
-	cout << "pic: " << picPath << '\n';
-	cout << "svg: " << svgPath << '\n';
-	cout << "limitColorQuantity: " << limitColorQuantity << '\n';
+	cout << "==========" << endl
+		 << "pic: " << picPath << endl
+		 << "svg: " << svgPath << endl
+		 << "limitColorQuantity: " << limitColorQuantity << endl
+		 << "==========" << endl;
 
 	SvgMake svgMake;
 
