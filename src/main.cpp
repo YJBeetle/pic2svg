@@ -2,6 +2,10 @@
 #include <fstream>
 #include <string>
 #include <cstring>
+#include <cstdint>
+#include <unordered_set>
+#include <unordered_map>
+#include <cmath>
 #include <png.h>
 #include <getopt.h>
 
@@ -86,8 +90,50 @@ public:
 		return 1;
 	}
 
-	void LimitColor(int limitColorSum)
+	void LimitColor(int colorQuantity)
 	{
+		struct ColorInfo
+		{
+			size_t usageCount = 0;
+			double adjacentColorDistance = 512; // 512 = √[ 256 ^ 2 * 4 ]
+			uint32_t mapTo;
+		};
+
+		unordered_map<uint32_t, ColorInfo> colorMap;
+
+		// 统计 usageCount
+		for (png_uint_32 y = 0; y < png.height; y++)
+		{
+			for (png_uint_32 x = 0; x < png.width; x++)
+			{
+				auto p = buffer + (png.width * 4 * y) + x * 4;
+				uint32_t c = *((uint32_t *)p);
+				auto t = colorMap.find(c);
+				if (t != colorMap.end())
+					t->second.usageCount++;
+				else
+					(colorMap[c] = ColorInfo()).usageCount = 1;
+			}
+		}
+
+		// 统计 adjacentColorDistance
+		for (auto color1 : colorMap)
+		{
+			for (auto color2 : colorMap)
+			{
+				uint8_t *colorRGBA_1 = (uint8_t *)(&(color1.first));
+				uint8_t *colorRGBA_2 = (uint8_t *)(&(color2.first));
+
+				double distance = sqrtf(powf(colorRGBA_1[0] - colorRGBA_2[0], 2) + pow(colorRGBA_1[1] - colorRGBA_2[1], 2) + pow(colorRGBA_1[2] - colorRGBA_2[2], 2) + pow(colorRGBA_1[3] - colorRGBA_2[3], 2));
+
+				if (distance < color1.second.adjacentColorDistance)
+					color1.second.adjacentColorDistance = distance;
+			}
+		}
+
+		// colorQuantity
+
+		// unordered_set<uint32_t> colorAdjacentColorDistanceSort;
 	}
 
 	void saveToSvgByPixel(string svgPath)
@@ -147,14 +193,14 @@ int main(int argC, char **argV)
 {
 	string pngPath;
 	string svgPath;
-	int limitColorSum = 32;
+	int limitColorQuantity = 32;
 
 	int ch;
 	while ((ch = getopt(argC, argV, "c:")) != -1)
 		switch (ch)
 		{
 		case 'c':
-			limitColorSum = stoi(optarg);
+			limitColorQuantity = stoi(optarg);
 			break;
 		case '?':
 		default:
@@ -177,11 +223,15 @@ int main(int argC, char **argV)
 
 	cout << "png: " << pngPath << '\n';
 	cout << "svg: " << svgPath << '\n';
-	cout << "limitColorSum: " << limitColorSum << '\n';
+	cout << "limitColorQuantity: " << limitColorQuantity << '\n';
 
 	SvgMake svgMake;
+
+	cout << "Reading PNG..." << endl;
 	svgMake.openPng(pngPath);
-	svgMake.LimitColor(limitColorSum);
+
+	cout << "Limit Color..." << endl;
+	svgMake.LimitColor(limitColorQuantity);
 
 #ifdef DEBUG
 	string debug1png = pngPath + ".debug1.png";
@@ -189,5 +239,6 @@ int main(int argC, char **argV)
 	svgMake.SaveToPng(debug1png);
 #endif
 
+	cout << "saveToSvgByPixel..." << endl;
 	svgMake.saveToSvgByPixel(svgPath);
 }
