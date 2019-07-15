@@ -6,14 +6,15 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <cmath>
-#include <png.h>
+#include <opencv2/opencv.hpp>
 #include <getopt.h>
 
 using namespace std;
+using namespace cv;
 
 void help()
 {
-	cerr << "Usage: png2svg <PNG_FILE> <SVG_FILE>" << '\n';
+	cerr << "Usage: pic2svg <PICTURE_FILE> <SVG_FILE>" << '\n';
 	exit(1);
 }
 
@@ -22,118 +23,44 @@ class SvgMake
 public:
 	SvgMake()
 	{
-		memset(&png, 0, (sizeof png));
 	}
 
 	~SvgMake()
 	{
-		clear();
 	}
 
-	void clear()
+	void openPic(string path)
 	{
-		png_image_free(&png);
-		if (buffer)
-		{
-			free(buffer);
-			buffer = nullptr;
-		}
+		pic = imread(path,IMREAD_UNCHANGED);
 	}
 
-	int openPng(string pngPath)
+	void saveTo(string path)
 	{
-		clear();
-		png.version = PNG_IMAGE_VERSION;
-
-		if (png_image_begin_read_from_file(&png, pngPath.c_str()) != 0)
-		{
-			png.format = PNG_FORMAT_RGBA;
-			buffer = (png_bytep)malloc(PNG_IMAGE_SIZE(png));
-
-			if (buffer != nullptr)
-			{
-				if (png_image_finish_read(&png, NULL /*background*/, buffer, 0 /*row_stride*/, NULL /*colormap*/) != 0)
-				{
-					cout << "Read PNG done." << endl;
-				}
-				else
-				{
-					cerr << "Read PNG file error." << endl;
-					goto err;
-				}
-			}
-			else
-			{
-				cerr << "malloc error." << endl;
-				goto err;
-			}
-		}
-		else
-		{
-			cerr << "Open PNG file error." << endl;
-			goto err;
-		}
-
-		return 0;
-
-	err:
-		return 1;
+		imwrite(path, pic);
 	}
 
-	int SaveToPng(string path)
+	void limitColor(int colorQuantity)
 	{
-		if (png_image_write_to_file(&png, path.c_str(), 0 /*convert_to_8bit*/, buffer, 0 /*row_stride*/, NULL /*colormap*/) != 0)
-		{
-			/* The image has been written successfully. */
-			return 0;
-		}
-		return 1;
-	}
+		Mat samples(pic.rows * pic.cols, 3, CV_32F);
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
+				for (int z = 0; z < 3; z++)
+					samples.at<float>(y + x * pic.rows, z) = pic.at<Vec4b>(y, x)[z];
 
-	void LimitColor(int colorQuantity)
-	{
-		struct ColorInfo
-		{
-			size_t usageCount = 0;
-			double adjacentColorDistance = 512; // 512 = √[ 256 ^ 2 * 4 ]
-			uint32_t mapTo;
-		};
+		int clusterCount = colorQuantity;
+		Mat labels;
+		int attempts = 5;
+		Mat centers;
+		kmeans(samples, clusterCount, labels, TermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers);
 
-		unordered_map<uint32_t, ColorInfo> colorMap;
-
-		// 统计 usageCount
-		for (png_uint_32 y = 0; y < png.height; y++)
-		{
-			for (png_uint_32 x = 0; x < png.width; x++)
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
 			{
-				auto p = buffer + (png.width * 4 * y) + x * 4;
-				uint32_t c = *((uint32_t *)p);
-				auto t = colorMap.find(c);
-				if (t != colorMap.end())
-					t->second.usageCount++;
-				else
-					(colorMap[c] = ColorInfo()).usageCount = 1;
+				int cluster_idx = labels.at<int>(y + x * pic.rows, 0);
+				pic.at<Vec4b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
+				pic.at<Vec4b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
+				pic.at<Vec4b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
 			}
-		}
-
-		// 统计 adjacentColorDistance
-		for (auto color1 : colorMap)
-		{
-			for (auto color2 : colorMap)
-			{
-				uint8_t *colorRGBA_1 = (uint8_t *)(&(color1.first));
-				uint8_t *colorRGBA_2 = (uint8_t *)(&(color2.first));
-
-				double distance = sqrtf(powf(colorRGBA_1[0] - colorRGBA_2[0], 2) + pow(colorRGBA_1[1] - colorRGBA_2[1], 2) + pow(colorRGBA_1[2] - colorRGBA_2[2], 2) + pow(colorRGBA_1[3] - colorRGBA_2[3], 2));
-
-				if (distance < color1.second.adjacentColorDistance)
-					color1.second.adjacentColorDistance = distance;
-			}
-		}
-
-		// colorQuantity
-
-		// unordered_set<uint32_t> colorAdjacentColorDistanceSort;
 	}
 
 	void saveToSvgByPixel(string svgPath)
@@ -142,26 +69,25 @@ public:
 		svg.open(svgPath, fstream::out);
 
 		svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
-			<< R"(<!-- Generator: png2svg -->)";
+			<< R"(<!-- Generator: pic2svg -->)";
 
-		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << png.width << ' ' << png.height << R"(">)";
+		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)";
 
 		char color[7];
 		color[6] = 0;
-		for (png_uint_32 y = 0; y < png.height; y++)
-		{
-			for (png_uint_32 x = 0; x < png.width; x++)
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
 			{
-				auto p = buffer + (png.width * 4 * y) + x * 4;
+				auto p = pic.at<Vec4b>(y, x);
 
 				if (p[3])
 				{
-					color[0] = p[0] >> 4;
-					color[1] = p[0] & 0xF;
+					color[0] = p[2] >> 4;
+					color[1] = p[2] & 0xF;
 					color[2] = p[1] >> 4;
 					color[3] = p[1] & 0xF;
-					color[4] = p[2] >> 4;
-					color[5] = p[2] & 0xF;
+					color[4] = p[0] >> 4;
+					color[5] = p[0] & 0xF;
 					color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
 					color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
 					color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
@@ -177,7 +103,6 @@ public:
 					svg << "/>";
 				}
 			}
-		}
 
 		svg << R"(</svg>)";
 
@@ -185,13 +110,12 @@ public:
 	}
 
 private:
-	png_image png;
-	png_bytep buffer = nullptr;
+	Mat pic;
 };
 
 int main(int argC, char **argV)
 {
-	string pngPath;
+	string picPath;
 	string svgPath;
 	int limitColorQuantity = 32;
 
@@ -208,35 +132,35 @@ int main(int argC, char **argV)
 		}
 
 	for (int index = optind; index < argC; index++)
-		if (pngPath.empty())
-			pngPath = argV[index];
+		if (picPath.empty())
+			picPath = argV[index];
 		else if (svgPath.empty())
 			svgPath = argV[index];
 
-	if (pngPath.empty())
+	if (picPath.empty())
 		help();
 
 	if (svgPath.empty())
 	{
-		svgPath = pngPath.substr(0, pngPath.rfind(".")) + ".svg";
+		svgPath = picPath.substr(0, picPath.rfind(".")) + ".svg";
 	}
 
-	cout << "png: " << pngPath << '\n';
+	cout << "pic: " << picPath << '\n';
 	cout << "svg: " << svgPath << '\n';
 	cout << "limitColorQuantity: " << limitColorQuantity << '\n';
 
 	SvgMake svgMake;
 
-	cout << "Reading PNG..." << endl;
-	svgMake.openPng(pngPath);
+	cout << "Reading picture..." << endl;
+	svgMake.openPic(picPath);
 
 	cout << "Limit Color..." << endl;
-	svgMake.LimitColor(limitColorQuantity);
+	svgMake.limitColor(limitColorQuantity);
 
 #ifdef DEBUG
-	string debug1png = pngPath + ".debug1.png";
-	cout << "[DEBUG] save to" << debug1png << endl;
-	svgMake.SaveToPng(debug1png);
+	string debug1pic = picPath + ".debug1.png";
+	cout << "[DEBUG] save to: " << debug1pic << endl;
+	svgMake.saveTo(debug1pic);
 #endif
 
 	cout << "saveToSvgByPixel..." << endl;
