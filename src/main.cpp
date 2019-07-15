@@ -102,17 +102,17 @@ public:
 			{1, -1},
 		}; // 打表
 		const Point pointAddByDirection2[8] = {
-			{1, 0},
+			{1, 1},
 			{1, 1},
 			{0, 1},
-			{-1, 1},
-			{-1, 0},
-			{-1, -1},
-			{0, -1},
-			{1, -1},
+			{0, 1},
+			{0, 0},
+			{0, 0},
+			{1, 0},
+			{1, 0},
 		}; // 打表
 
-		bool *mask = new bool[pic.cols * pic.rows]{};
+		uint8_t *mask = new uint8_t[pic.cols * pic.rows]{};
 		char color[7];
 		color[6] = 0;
 		for (int y = 0; y < pic.rows; y++)
@@ -120,7 +120,7 @@ public:
 			{
 				auto p = pic.at<Vec4b>(y, x);
 				if (p[3] &&
-					mask[y * pic.cols + x] == false && // 未标记
+					mask[y * pic.cols + x] == 0 && // 未标记
 					(pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x + 1) ||
 					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y + 1, x) ||
 					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x - 1) ||
@@ -131,9 +131,11 @@ public:
 					int yy = y;
 
 					vector<Point> points;
-					points.push_back({x : x, y : y}); // 添加第一个点
+					points.push_back({x : x, y : y});   // 添加第一个点
+					mask[yy * pic.cols + xx] |= 1 << 5; // 起始点
+					mask[yy * pic.cols + xx] |= 1 << 6; // 上边缘
 
-					uint8_t lastDirection = 0;
+					uint8_t lastDirection = 5;
 
 					for (size_t iiiiii = 0; iiiiii < 1000; iiiiii++)
 					// while (1)
@@ -150,7 +152,6 @@ public:
 							| 3 | 2 | 1 |
 							 -----------
 						*/
-						mask[yy * pic.cols + xx] = true;
 
 						uint8_t t = 0b00000000;
 						for (uint8_t i = 0; i < 8; i++)
@@ -158,38 +159,40 @@ public:
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
 						}
 
-						for (uint8_t addDirection = 0; addDirection < 8; addDirection++)
+						for (uint8_t endDirection = lastDirection + 2 /* 跳过第一个边缘 */; endDirection < lastDirection + 8; endDirection++)
 						{
-							uint8_t endDirection = lastDirection + addDirection;
 							uint8_t direction = endDirection >= 8 ? endDirection - 8 : endDirection;
 
-							if ((t & (1 << direction)) == (1 << direction)) // 下一个方向上有东西
+							if ((t & (1 << direction)) == (1 << direction)) // direction方向上有相同色
 							{
+								if (mask[yy * pic.cols + xx] & (1 << direction))
+									goto closure;
+
 								// 添加喵点
-								for (uint8_t nowDirection = lastDirection; nowDirection <= endDirection; nowDirection++)
+								for (uint8_t pointDirection = lastDirection + 2 /* 跳过第一个边缘 */; pointDirection <= endDirection; pointDirection++)
 								{
-									uint8_t ddirection = nowDirection >= 8 ? nowDirection - 8 : nowDirection;
-									points.push_back({x : xx + pointAddByDirection2[ddirection].x, y : yy + pointAddByDirection2[ddirection].y});
-									// 	points.push_back({x : xx + 1, y : yy});		// 添加当前点的右上角坐标
-									// 	points.push_back({x : xx + 1, y : yy + 1}); // 添加当前点的右下角坐标
-									// 	points.push_back({x : xx, y : yy + 1});		// 添加当前点的左下角坐标
-									// 	points.push_back({x : xx, y : yy});			// 添加当前点的左上角坐标
-									// 	points.push_back({x : xx - 1, y : yy});		//
+									uint8_t pointRealDirection = pointDirection >= 8 ? pointDirection - 8 : pointDirection;
+									if (pointRealDirection % 2 == 1) // 偶数为边，奇数为角
+									{
+										points.push_back({x : xx + pointAddByDirection2[pointRealDirection].x, y : yy + pointAddByDirection2[pointRealDirection].y});
+										lastDirection = pointRealDirection + 4 >= 8 ? pointRealDirection + 4 - 8 : pointRealDirection + 4;
+									}
+									mask[yy * pic.cols + xx] |= 1 << pointRealDirection;
 								}
 
 								// 下一个点坐标
 								xx += pointAddByDirection[direction].x;
 								yy += pointAddByDirection[direction].y;
-								lastDirection = direction;
 
 								break;
 							}
 						}
 
-						// if ((xx == x && yy == y) || mask[yy * pic.cols + xx])
-						if (xx == x && yy == y)
-							break;
+						// if (xx == x && yy == y)
+						// 	break;
 					}
+
+				closure:
 
 					color[0] = p[2] >> 4;
 					color[1] = p[2] & 0xF;
@@ -218,7 +221,7 @@ public:
 				}
 			}
 
-			onlyfirst:
+	onlyfirst:
 
 		svg << R"(</svg>)";
 
