@@ -180,6 +180,7 @@ public:
 								// 下一个点坐标
 								xx += pointAddByDirection[direction].x;
 								yy += pointAddByDirection[direction].y;
+								lastDirection = direction;
 
 								break;
 							}
@@ -212,10 +213,16 @@ public:
 					if (p[3] != 0xFF)
 						svg << " opacity=\"" << (float)p[3] / 0xFF << "\"";
 					svg << "/>" << endl;
+
+					// goto onlyfirst;	//debug: onlyfirst
 				}
 			}
 
+			onlyfirst:
+
 		svg << R"(</svg>)";
+
+		free(mask);
 
 		svg.close();
 	}
