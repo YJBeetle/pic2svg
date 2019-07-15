@@ -159,9 +159,11 @@ public:
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
 						}
 
-						for (uint8_t endDirection = lastDirection + 2 /* 跳过第一个边缘 */; endDirection < lastDirection + 8; endDirection++)
+						for (uint8_t endDirection = lastDirection + 2 /* 跳过第一个边缘 */; endDirection < lastDirection + 8 + 2; endDirection++)
 						{
-							uint8_t direction = endDirection >= 8 ? endDirection - 8 : endDirection;
+							uint8_t direction = endDirection;
+							direction = direction >= 8 ? direction - 8 : direction;
+							direction = direction >= 8 ? direction - 8 : direction;
 
 							if ((t & (1 << direction)) == (1 << direction)) // direction方向上有相同色
 							{
