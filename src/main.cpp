@@ -63,18 +63,24 @@ int main(int argC, char **argV)
 					if (p[3])
 					{
 						color[0] = p[0] >> 4;
-						color[1] = p[0] & 0b00001111;
+						color[1] = p[0] & 0xF;
 						color[2] = p[1] >> 4;
-						color[3] = p[1] & 0b00001111;
+						color[3] = p[1] & 0xF;
 						color[4] = p[2] >> 4;
-						color[5] = p[2] & 0b00001111;
+						color[5] = p[2] & 0xF;
 						color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
 						color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
 						color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
 						color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
 						color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
 						color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
-						svg << R"(<rect x=")" << x << R"(" y=")" << y << R"(" width="1" height="1" fill="#)" << color << R"(" opacity=")" << (float)p[3] / 0xFF << R"("/>)";
+						svg << R"(<rect width="1" height="1" )";
+						svg << "x=\"" << x << "\" ";
+						svg << "y=\"" << y << "\" ";
+						svg << "fill=\"#" << color << "\" ";
+						if (p[3] != 0xFF)
+							svg << "opacity=\"" << (float)p[3] / 0xFF << "\" ";
+						svg << "/>";
 					}
 				}
 			}
@@ -82,6 +88,10 @@ int main(int argC, char **argV)
 			svg << R"(</svg>)";
 
 			svg.close();
+			png_image_free(&image);
+			free(buffer);
+
+			cout << "done." << endl;
 		}
 		else
 		{
@@ -90,9 +100,9 @@ int main(int argC, char **argV)
 			else
 				free(buffer);
 
-			cerr << "Read PNG file error.";
+			cerr << "Read PNG file error." << endl;
 		}
 	}
 	else
-		cerr << "Open PNG file error.";
+		cerr << "Open PNG file error." << endl;
 }
