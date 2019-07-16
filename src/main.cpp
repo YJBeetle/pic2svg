@@ -149,8 +149,7 @@ public:
 					mask[yy * pic.cols + xx] |= (1 << lastDirection); // 起始点
 
 					//开始搜索附近点
-					for (size_t iiiiii = 0; iiiiii < 10000; iiiiii++)
-					// while (1)
+					while (1)
 					{
 						/*
 							  7      0
@@ -192,6 +191,7 @@ public:
 								goto nextPoint;
 							}
 						}
+
 						goto closure;
 
 					nextPoint:;
