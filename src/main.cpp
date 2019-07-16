@@ -131,8 +131,9 @@ public:
 
 						// 确定搜索旋转方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
+						// cout << (int)turnDirection << endl;
 
-						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8) * turnDirection; forDirection * turnDirection <= endDirection * turnDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
+						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8+2) * turnDirection; forDirection * turnDirection <= endDirection * turnDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到一圈结束
 						{
 							int8_t direction = DirectionFix(forDirection);
 
