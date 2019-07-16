@@ -11,6 +11,17 @@
 #include <opencv2/opencv.hpp>
 #include <getopt.h>
 
+inline void DirectionFixMax(int8_t &d) { d = d >= 8 ? d - 8 : d; }
+inline void DirectionFixMin(int8_t &d) { d = d < 0 ? d + 8 : d; }
+inline void DirectionFix(int8_t &d)
+{
+	while (d >= 8)
+		d -= 8;
+	while (d < 0)
+		d += 8;
+}
+inline bool isSame(uint8_t &t, int8_t &d) { return (t & (1 << d)) == (1 << d); }
+
 using namespace std;
 using namespace cv;
 
@@ -127,17 +138,17 @@ public:
 					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y - 1, x)) // 任意一方是边缘
 				)
 				{
+					// 找到一个起始点
 					int xx = x;
 					int yy = y;
 
 					vector<Point> points;
-					points.push_back({x : x, y : y});   // 添加第一个点
-					mask[yy * pic.cols + xx] |= 1 << 5; // 起始点
-					mask[yy * pic.cols + xx] |= 1 << 6; // 上边缘
+					points.push_back({x : x, y : y}); // 添加第一个点
+					int8_t lastDirection = 5;
+					mask[yy * pic.cols + xx] |= (1 << lastDirection); // 起始点
 
-					uint8_t lastDirection = 5;
-
-					for (size_t iiiiii = 0; iiiiii < 1000; iiiiii++)
+					//开始搜索附近点
+					for (size_t iiiiii = 0; iiiiii < 10000; iiiiii++)
 					// while (1)
 					{
 						/*
@@ -152,46 +163,43 @@ public:
 							| 3 | 2 | 1 |
 							 -----------
 						*/
-
 						uint8_t t = 0b00000000;
 						for (uint8_t i = 0; i < 8; i++)
-						{
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
-						}
 
-						for (uint8_t endDirection = lastDirection + 2 /* 跳过第一个边缘 */; endDirection < lastDirection + 8 + 2; endDirection++)
+						// 确定方向
+						int8_t td = lastDirection + 1;
+						DirectionFixMax(td);
+						int8_t turnDirection = isSame(t, td) ? -1 : 1;
+
+						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
 						{
-							uint8_t direction = endDirection;
-							direction = direction >= 8 ? direction - 8 : direction;
-							direction = direction >= 8 ? direction - 8 : direction;
+							int8_t direction = forDirection;
+							DirectionFix(direction);
 
-							if ((t & (1 << direction)) == (1 << direction)) // direction方向上有相同色
+							if (isSame(t, direction)) // direction方向上有相同色
 							{
-								if (mask[yy * pic.cols + xx] & (1 << direction))
+								if (isSame(mask[(yy + pointAddByDirection[direction].y) * pic.cols + xx + pointAddByDirection[direction].x], direction)) //遇到了起点
 									goto closure;
-
-								// 添加喵点
-								for (uint8_t pointDirection = lastDirection + 2 /* 跳过第一个边缘 */; pointDirection <= endDirection; pointDirection++)
+								else
 								{
-									uint8_t pointRealDirection = pointDirection >= 8 ? pointDirection - 8 : pointDirection;
-									if (pointRealDirection % 2 == 1) // 偶数为边，奇数为角
-									{
-										points.push_back({x : xx + pointAddByDirection2[pointRealDirection].x, y : yy + pointAddByDirection2[pointRealDirection].y});
-										lastDirection = pointRealDirection + 4 >= 8 ? pointRealDirection + 4 - 8 : pointRealDirection + 4;
-									}
-									mask[yy * pic.cols + xx] |= 1 << pointRealDirection;
+									// 下一个点坐标
+									xx += pointAddByDirection[direction].x;
+									yy += pointAddByDirection[direction].y;
+									lastDirection = direction + 4;
+									DirectionFixMax(lastDirection);
+
+									goto nextPoint;
 								}
-
-								// 下一个点坐标
-								xx += pointAddByDirection[direction].x;
-								yy += pointAddByDirection[direction].y;
-
-								break;
 							}
-						}
 
-						// if (xx == x && yy == y)
-						// 	break;
+							// if (direction % 2 == 1) // 偶数为边，奇数为角
+							points.push_back({x : xx + pointAddByDirection2[direction].x, y : yy + pointAddByDirection2[direction].y}); // 添加喵点
+							mask[yy * pic.cols + xx] |= (1 << direction);
+						}
+						goto closure;
+
+					nextPoint:;
 					}
 
 				closure:
@@ -223,7 +231,7 @@ public:
 				}
 			}
 
-	onlyfirst:
+	// onlyfirst:
 
 		svg << R"(</svg>)";
 
