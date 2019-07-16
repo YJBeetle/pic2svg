@@ -88,55 +88,18 @@ public:
 
 	void saveToSvgByPixel(string svgPath)
 	{
-		fstream svg;
-		svg.open(svgPath, fstream::out);
-
-		// svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
-		// 	<< R"(<!-- Generator: pic2svg -->)";
-
-		// svg << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
-		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
-		svg << "<title>pic2svg</title>" << endl;
-
-		struct Point
-		{
-			int x;
-			int y;
-		};
-		const Point pointAddByDirection[8] = {
-			{1, 0},
-			{1, 1},
-			{0, 1},
-			{-1, 1},
-			{-1, 0},
-			{-1, -1},
-			{0, -1},
-			{1, -1},
-		}; // 打表
-		const Point pointAddByDirection2[8] = {
-			{1, 1},
-			{1, 1},
-			{0, 1},
-			{0, 1},
-			{0, 0},
-			{0, 0},
-			{1, 0},
-			{1, 0},
-		}; // 打表
-
+		unordered_map<uint32_t, vector<vector<Point>>> pointsArrayByColors;
 		bool *mask = new bool[pic.cols * pic.rows]{};
-		char color[7];
-		color[6] = 0;
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				auto p = pic.at<Vec4b>(y, x);
-				if (p[3] &&
+				uint32_t p = pic.at<uint32_t>(y, x);
+				if ((p & 0xFF000000) &&				   // Aplha不为空
 					mask[y * pic.cols + x] == false && // 未标记
-					(pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x + 1) ||
-					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y + 1, x) ||
-					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y, x - 1) ||
-					 pic.at<uint32_t>(y, x) != pic.at<uint32_t>(y - 1, x)) // 任意一方是边缘
+					(p != pic.at<uint32_t>(y, x + 1) ||
+					 p != pic.at<uint32_t>(y + 1, x) ||
+					 p != pic.at<uint32_t>(y, x - 1) ||
+					 p != pic.at<uint32_t>(y - 1, x)) // 任意一方是边缘
 				)
 				{
 					// 找到一个起始点
@@ -169,7 +132,7 @@ public:
 						for (uint8_t i = 0; i < 8; i++)
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
 
-						// 确定方向
+						// 确定搜索旋转方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
 
 						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
@@ -202,42 +165,88 @@ public:
 
 				closure:
 
-					color[0] = p[2] >> 4;
-					color[1] = p[2] & 0xF;
-					color[2] = p[1] >> 4;
-					color[3] = p[1] & 0xF;
-					color[4] = p[0] >> 4;
-					color[5] = p[0] & 0xF;
-					color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
-					color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
-					color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
-					color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
-					color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
-					color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
-
-					svg << "<polygon";
-					svg << " points=\"";
-					for (auto point : points)
-						svg << point.x << "," << point.y << " ";
-					svg << "\"";
-					svg << " fill=\"#" << color << "\"";
-					if (p[3] != 0xFF)
-						svg << " opacity=\"" << (float)p[3] / 0xFF << "\"";
-					svg << "/>" << endl;
+					pointsArrayByColors[p].push_back(std::move(points));
 
 				ignore:;
 				}
 			}
+		free(mask);
+
+		fstream svg;
+		svg.open(svgPath, fstream::out);
+		char color[7];
+		color[6] = 0;
+
+		// svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
+		// 	<< R"(<!-- Generator: pic2svg -->)";
+
+		// svg << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
+		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
+		svg << "<title>pic2svg</title>" << endl;
+
+		for (auto pointsArray : pointsArrayByColors)
+		{
+			uint32_t p = pointsArray.first;
+			for (auto points : pointsArray.second)
+			{
+				color[0] = (p & 0xF00000) >> 20;
+				color[1] = (p & 0x0F0000) >> 16;
+				color[2] = (p & 0x00F000) >> 12;
+				color[3] = (p & 0x000F00) >> 8;
+				color[4] = (p & 0x0000F0) >> 4;
+				color[5] = (p & 0x00000F) >> 0;
+				color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
+				color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
+				color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
+				color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
+				color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
+				color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
+
+				svg << "<polygon";
+				svg << " points=\"";
+				for (auto point : points)
+					svg << point.x << "," << point.y << " ";
+				svg << "\"";
+				svg << " fill=\"#" << color << "\"";
+				if ((p >> 24) != 0xFF)
+					svg << " opacity=\"" << (float)(p >> 24) / 0xFF << "\"";
+				svg << "/>" << endl;
+			}
+		}
 
 		svg << R"(</svg>)";
-
-		free(mask);
 
 		svg.close();
 	}
 
 private:
 	Mat pic;
+
+	struct Point
+	{
+		int x;
+		int y;
+	};
+	const Point pointAddByDirection[8] = {
+		{1, 0},
+		{1, 1},
+		{0, 1},
+		{-1, 1},
+		{-1, 0},
+		{-1, -1},
+		{0, -1},
+		{1, -1},
+	}; // 打表
+	const Point pointAddByDirection2[8] = {
+		{1, 1},
+		{1, 1},
+		{0, 1},
+		{0, 1},
+		{0, 0},
+		{0, 0},
+		{1, 0},
+		{1, 0},
+	}; // 打表
 };
 
 int main(int argC, char **argV)
