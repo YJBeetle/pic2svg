@@ -157,7 +157,6 @@ public:
 							}
 						}
 
-						// goto closure;
 						goto ignore;
 
 					nextPoint:;
