@@ -145,7 +145,7 @@ public:
 
 					vector<Point> points;
 					points.push_back({x : x, y : y}); // 添加第一个点
-					int8_t lastDirection = 5;
+					int8_t lastDirection = 4;
 					mask[yy * pic.cols + xx] |= (1 << lastDirection); // 起始点
 
 					//开始搜索附近点
@@ -174,24 +174,21 @@ public:
 						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
 						{
 							int8_t direction = DirectionFix(forDirection);
-
+							
 							if (isSame(t, direction)) // direction方向上有相同色
 							{
-								if ( isSame(mask[(yy + pointAddByDirection[direction].y) * pic.cols + xx + pointAddByDirection[direction].x], DirectionFix(direction - turnDirection))) //遇到了起点
-									goto closure;
-								else
-								{
-									// 下一个点坐标
-									xx += pointAddByDirection[direction].x;
-									yy += pointAddByDirection[direction].y;
-									lastDirection = DirectionFixMax(direction + 4);
+								// 下一个点坐标
+								xx += pointAddByDirection[direction].x;
+								yy += pointAddByDirection[direction].y;
+								lastDirection = DirectionFixMax(direction + 4);
 
-									goto nextPoint;
-								}
+								goto nextPoint;
 							}
 
 							// if (direction % 2 == 1) // 偶数为边，奇数为角
 							points.push_back({x : xx + pointAddByDirection2[direction].x, y : yy + pointAddByDirection2[direction].y}); // 添加喵点
+							if (isSame(mask[yy * pic.cols + xx], direction))															//遇到了起点
+								goto closure;
 							mask[yy * pic.cols + xx] |= (1 << direction);
 						}
 						goto closure;
