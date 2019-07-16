@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 #include <cstdint>
+#include <bitset>
 #include <unordered_set>
 #include <unordered_map>
 #include <list>
@@ -136,10 +137,11 @@ public:
 						// 确定搜索旋转方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
 
-						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
+						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8) * turnDirection; forDirection * turnDirection <= endDirection * turnDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
 						{
 							int8_t direction = DirectionFix(forDirection);
 
+							// cout << bitset<8>(maskNow[yy * pic.cols + xx]) << endl;
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
@@ -160,6 +162,7 @@ public:
 							}
 						}
 
+						// goto closure;
 						goto ignore;
 
 					nextPoint:;
