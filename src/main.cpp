@@ -90,13 +90,13 @@ public:
 	void saveToSvgByPixel(string svgPath)
 	{
 		unordered_map<uint32_t, vector<vector<Point>>> pointsArrayByColors;
-		bool *mask = new bool[pic.cols * pic.rows]{};
+					unique_ptr<uint8_t[]> mask(new uint8_t[pic.cols * pic.rows]{});
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
 				uint32_t p = pic.at<uint32_t>(y, x);
 				if ((p & 0xFF000000) &&				   // Aplha不为空
-					mask[y * pic.cols + x] == false && // 未标记
+					mask[y * pic.cols + x] == 0 && // 未标记
 					(p != pic.at<uint32_t>(y, x + 1) ||
 					 p != pic.at<uint32_t>(y + 1, x) ||
 					 p != pic.at<uint32_t>(y, x - 1) ||
@@ -106,7 +106,6 @@ public:
 					// 找到一个起始点
 					int xx = x;
 					int yy = y;
-					unique_ptr<uint8_t[]> maskNow(new uint8_t[pic.cols * pic.rows]{});
 					vector<Point> points;
 
 					points.push_back({x : x, y : y});		 // 添加第一个点
@@ -141,11 +140,10 @@ public:
 						{
 							int8_t direction = DirectionFix(forDirection);
 
-							// cout << bitset<8>(maskNow[yy * pic.cols + xx]) << endl;
-							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
+							// cout << bitset<8>(mask[yy * pic.cols + xx]) << endl;
+							if (isSame(mask[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
-							maskNow[yy * pic.cols + xx] |= (1 << direction);
-							mask[yy * pic.cols + xx] = true;
+							mask[yy * pic.cols + xx] |= (1 << direction);
 
 							if (direction % 2 == 1)											  // 偶数为边，奇数为角
 								points.push_back({x : xx + pointAddByDirection2[direction].x, // 添加喵点
@@ -175,7 +173,6 @@ public:
 				ignore:;
 				}
 			}
-		free(mask);
 
 		fstream svg;
 		svg.open(svgPath, fstream::out);
