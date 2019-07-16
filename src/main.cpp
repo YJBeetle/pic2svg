@@ -11,16 +11,17 @@
 #include <opencv2/opencv.hpp>
 #include <getopt.h>
 
-inline void DirectionFixMax(int8_t &d) { d = d >= 8 ? d - 8 : d; }
-inline void DirectionFixMin(int8_t &d) { d = d < 0 ? d + 8 : d; }
-inline void DirectionFix(int8_t &d)
+inline int8_t DirectionFixMax(int8_t d) { return d >= 8 ? d - 8 : d; }
+inline int8_t DirectionFixMin(int8_t d) { return d < 0 ? d + 8 : d; }
+inline int8_t DirectionFix(int8_t d)
 {
 	while (d >= 8)
 		d -= 8;
 	while (d < 0)
 		d += 8;
+	return d;
 }
-inline bool isSame(uint8_t &t, int8_t &d) { return (t & (1 << d)) == (1 << d); }
+inline bool isSame(uint8_t t, int8_t d) { return (t & (1 << d)) == (1 << d); }
 
 using namespace std;
 using namespace cv;
@@ -168,26 +169,22 @@ public:
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
 
 						// 确定方向
-						int8_t td = lastDirection + 1;
-						DirectionFixMax(td);
-						int8_t turnDirection = isSame(t, td) ? -1 : 1;
+						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
 
 						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
 						{
-							int8_t direction = forDirection;
-							DirectionFix(direction);
+							int8_t direction = DirectionFix(forDirection);
 
 							if (isSame(t, direction)) // direction方向上有相同色
 							{
-								if (isSame(mask[(yy + pointAddByDirection[direction].y) * pic.cols + xx + pointAddByDirection[direction].x], direction)) //遇到了起点
+								if ( isSame(mask[(yy + pointAddByDirection[direction].y) * pic.cols + xx + pointAddByDirection[direction].x], DirectionFix(direction - turnDirection))) //遇到了起点
 									goto closure;
 								else
 								{
 									// 下一个点坐标
 									xx += pointAddByDirection[direction].x;
 									yy += pointAddByDirection[direction].y;
-									lastDirection = direction + 4;
-									DirectionFixMax(lastDirection);
+									lastDirection = DirectionFixMax(direction + 4);
 
 									goto nextPoint;
 								}
@@ -231,7 +228,7 @@ public:
 				}
 			}
 
-	// onlyfirst:
+		// onlyfirst:
 
 		svg << R"(</svg>)";
 
