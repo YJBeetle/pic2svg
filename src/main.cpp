@@ -170,7 +170,7 @@ public:
 						// 确定方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
 
-						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
+						for (int8_t forDirection = lastDirection + 2 * turnDirection, endDirection = lastDirection + (8) * turnDirection; forDirection <= endDirection; forDirection += turnDirection) // 从决定的方向+2开始搜索下一个点 直到包括+8（原方向）结束
 						{
 							int8_t direction = DirectionFix(forDirection);
 
@@ -192,7 +192,7 @@ public:
 							}
 						}
 
-						goto closure;
+						goto ignore;
 
 					nextPoint:;
 					}
@@ -222,11 +222,9 @@ public:
 						svg << " opacity=\"" << (float)p[3] / 0xFF << "\"";
 					svg << "/>" << endl;
 
-					// goto onlyfirst;	//debug: onlyfirst
+				ignore:;
 				}
 			}
-
-		// onlyfirst:
 
 		svg << R"(</svg>)";
 
