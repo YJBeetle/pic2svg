@@ -177,41 +177,44 @@ public:
 		char color[7];
 		color[6] = 0;
 
-		// svg << R"(<?xml version="1.0" encoding="utf-8"?>)"
-		// 	<< R"(<!-- Generator: pic2svg -->)";
-
-		// svg << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
-		svg << R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
-		svg << "<title>pic2svg</title>" << endl;
+		svg << R"(<?xml version="1.0" encoding="utf-8"?>)" << endl
+			<< R"(<!-- Generator: pic2svg -->)" << endl
+			// << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl
+			<< R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl
+			<< "<title>pic2svg</title>" << endl;
 
 		for (auto pointsArray : pointsArrayByColors)
 		{
 			uint32_t p = pointsArray.first;
+			color[0] = (p & 0xF00000) >> 20;
+			color[1] = (p & 0x0F0000) >> 16;
+			color[2] = (p & 0x00F000) >> 12;
+			color[3] = (p & 0x000F00) >> 8;
+			color[4] = (p & 0x0000F0) >> 4;
+			color[5] = (p & 0x00000F) >> 0;
+			color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
+			color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
+			color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
+			color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
+			color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
+			color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
+
+			svg << "<path d=\"";
+
 			for (auto points : pointsArray.second)
 			{
-				color[0] = (p & 0xF00000) >> 20;
-				color[1] = (p & 0x0F0000) >> 16;
-				color[2] = (p & 0x00F000) >> 12;
-				color[3] = (p & 0x000F00) >> 8;
-				color[4] = (p & 0x0000F0) >> 4;
-				color[5] = (p & 0x00000F) >> 0;
-				color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
-				color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
-				color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
-				color[3] = color[3] < 0xA ? color[3] + '0' : color[3] - 0xA + 'A';
-				color[4] = color[4] < 0xA ? color[4] + '0' : color[4] - 0xA + 'A';
-				color[5] = color[5] < 0xA ? color[5] + '0' : color[5] - 0xA + 'A';
-
-				svg << "<polygon";
-				svg << " points=\"";
+				svg << "M" << points.back().x << "," << points.back().y;
+				points.pop_back();
 				for (auto point : points)
-					svg << point.x << "," << point.y << " ";
-				svg << "\"";
-				svg << " fill=\"#" << color << "\"";
-				if ((p >> 24) != 0xFF)
-					svg << " opacity=\"" << (float)(p >> 24) / 0xFF << "\"";
-				svg << "/>" << endl;
+					svg << "L" << point.x << "," << point.y;
+				svg << "Z ";
 			}
+
+			svg << "\"";
+			svg << " fill=\"#" << color << "\"";
+			if ((p >> 24) != 0xFF)
+				svg << " opacity=\"" << (float)(p >> 24) / 0xFF << "\"";
+			svg << "/>" << endl;
 		}
 
 		svg << R"(</svg>)";
