@@ -108,9 +108,10 @@ public:
 					unique_ptr<uint8_t[]> maskNow(new uint8_t[pic.cols * pic.rows]{});
 					vector<Point> points;
 
-					points.push_back({x : x, y : y});					 // 添加第一个点
-					int8_t lastDirection = 4;							 // 起始方向
-					maskNow[yy * pic.cols + xx] |= (1 << lastDirection); // 起始点
+					points.push_back({x : x, y : y});		 // 添加第一个点
+					int8_t lastDirection = 4;				 // 起始方向
+					maskNow[yy * pic.cols + xx] |= (1 << 4); // 起始点
+					maskNow[yy * pic.cols + xx] |= (1 << 5); // 起始点
 					mask[yy * pic.cols + xx] = true;
 
 					//开始搜索附近点
@@ -139,13 +140,14 @@ public:
 						{
 							int8_t direction = DirectionFix(forDirection);
 
-							if (direction % 2 == 1)											  // 偶数为边，奇数为角
-								points.push_back({x : xx + pointAddByDirection2[direction].x, // 添加喵点
-												  y : yy + pointAddByDirection2[direction].y});
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
 							mask[yy * pic.cols + xx] = true;
+
+							if (direction % 2 == 1)											  // 偶数为边，奇数为角
+								points.push_back({x : xx + pointAddByDirection2[direction].x, // 添加喵点
+												  y : yy + pointAddByDirection2[direction].y});
 
 							if (isSame(t, direction)) // direction方向上有相同色
 							{
