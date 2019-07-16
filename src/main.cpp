@@ -108,11 +108,7 @@ public:
 					int yy = y;
 					vector<Point> points;
 
-					points.push_back({x : x, y : y});		 // 添加第一个点
-					int8_t lastDirection = 4;				 // 起始方向
-					maskNow[yy * pic.cols + xx] |= (1 << 4); // 起始点
-					maskNow[yy * pic.cols + xx] |= (1 << 5); // 起始点
-					mask[yy * pic.cols + xx] = true;
+					int8_t lastDirection = 5;				 // 起始方向
 
 					//开始搜索附近点
 					while (1)
