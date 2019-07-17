@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cstdint>
 #include <bitset>
+#include <memory>
 #include <unordered_set>
 #include <unordered_map>
 #include <list>
@@ -89,7 +90,7 @@ public:
 
 	void saveToSvgByPixel(string svgPath)
 	{
-		unordered_map<uint32_t, vector<vector<Point>>> pointsArrayByColors;
+		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors;
 		unique_ptr<uint8_t[]> mask(new uint8_t[pic.cols * pic.rows]{});
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
@@ -103,7 +104,7 @@ public:
 					// 找到一个起始点
 					int xx = x;
 					int yy = y;
-					vector<Point> points;
+					list<Point> points;
 					unique_ptr<uint8_t[]> maskNow(new uint8_t[pic.cols * pic.rows]{});
 
 					int8_t lastDirection = 5; // 起始方向
@@ -173,6 +174,71 @@ public:
 				}
 			}
 
+		//删除直线上的不需要的点
+		for (auto &pointsArray : pointsArrayByColors)
+		{
+			for (auto &points : pointsArray.second)
+			{
+				// 删除相邻重合点
+				{
+					Point last = points.front();
+					Point now = {-1, -1};
+					for (auto point = ++points.cbegin(); point != points.cend();)
+					{
+						now = *point;
+						if (now.x == last.x && now.y == last.y) // 重合
+						{
+							points.erase(point++);
+							last = now;
+						}
+						else
+						{
+							last = now;
+							point++;
+						}
+					}
+					// 结尾处理
+					last = points.front();
+					now = points.back();
+					if (last.x == now.x && last.y == now.y)
+						points.pop_back();
+				}
+
+				// 删除三点一线
+				{
+					Point lastlast = points.front();
+					Point last = *(++points.cbegin());
+					Point now = {-1, -1};
+					for (auto point = ++++points.cbegin(); point != points.cend(); point++)
+					{
+						now = *point;
+						if ((now.x * last.y - now.y * last.x) + (last.x * lastlast.y - last.y * lastlast.x) + (lastlast.x * now.y - lastlast.y * now.x) == 0) // 三点一线
+						{
+							points.erase((--point)++);
+							last = now;
+						}
+						else
+						{
+							lastlast = last;
+							last = now;
+						}
+					}
+					// 结尾处理
+					lastlast = *(++points.crbegin());
+					last = points.back();
+					now = points.front();
+					if ((now.x * last.y - now.y * last.x) + (last.x * lastlast.y - last.y * lastlast.x) + (lastlast.x * now.y - lastlast.y * now.x) == 0)
+						points.pop_back();
+					// 结尾处理
+					lastlast = *(++points.cbegin());
+					last = points.front();
+					now = points.back();
+					if ((now.x * last.y - now.y * last.x) + (last.x * lastlast.y - last.y * lastlast.x) + (lastlast.x * now.y - lastlast.y * now.x) == 0)
+						points.pop_front();
+				}
+			}
+		}
+
 		fstream svg;
 		svg.open(svgPath, fstream::out);
 		char color[7];
@@ -184,7 +250,7 @@ public:
 			<< R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl
 			<< "<title>pic2svg</title>" << endl;
 
-		for (auto pointsArray : pointsArrayByColors)
+		for (auto &pointsArray : pointsArrayByColors)
 		{
 			uint32_t p = pointsArray.first;
 			color[0] = (p & 0xF00000) >> 20;
@@ -202,11 +268,12 @@ public:
 
 			svg << "<path d=\"";
 
-			for (auto points : pointsArray.second)
+			for (auto &points : pointsArray.second)
 			{
-				svg << "M" << points.back().x << "," << points.back().y;
-				points.pop_back();
-				for (auto point : points)
+				auto point = points.front();
+				svg << "M" << point.x << "," << point.y;
+				points.pop_front();
+				for (auto &point : points)
 					svg << "L" << point.x << "," << point.y;
 				svg << "Z ";
 			}
