@@ -97,12 +97,10 @@ public:
 				uint32_t p = pic.at<uint32_t>(y, x);
 				if ((p & 0xFF000000) && // Aplha不为空
 					// (mask[y * pic.cols + x] & (1 << 5)) == 0 && // 方位5（左上角）未标记
-					(mask[y * pic.cols + x] & 0b11100011) == 0 && // 方位除了234未标记
+					// (mask[y * pic.cols + x] & 0b11100011) == 0 && // 方位除了234未标记
 					// mask[y * pic.cols + x] == 0 && // 未标记
 					(p != pic.at<uint32_t>(y, x + 1) ||
-					 p != pic.at<uint32_t>(y + 1, x) ||
-					 p != pic.at<uint32_t>(y, x - 1) ||
-					 p != pic.at<uint32_t>(y - 1, x)) // 任意一方是边缘
+					 p != pic.at<uint32_t>(y + 1, x)) // 左上方是边缘
 				)
 				{
 					// 找到一个起始点
@@ -130,6 +128,10 @@ public:
 						uint8_t t = 0b00000000;
 						for (uint8_t i = 0; i < 8; i++)
 							t |= (pic.at<uint32_t>(yy, xx) == pic.at<uint32_t>(yy + pointAddByDirection[i].y, xx + pointAddByDirection[i].x)) << i;
+
+						// 如果上下左右都被包围则放弃这条线
+						if ((t & 0b01010101) == 0b01010101)
+							goto ignore;
 
 						// 确定搜索旋转方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
