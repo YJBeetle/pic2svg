@@ -1,15 +1,10 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <cstring>
-#include <cstdint>
-#include <bitset>
 #include <memory>
-#include <unordered_set>
 #include <unordered_map>
 #include <list>
 #include <vector>
-#include <cmath>
 #include <opencv2/opencv.hpp>
 #include <getopt.h>
 
@@ -139,7 +134,6 @@ public:
 						{
 							int8_t direction = DirectionFix(forDirection);
 
-							// cout << bitset<8>(mask[yy * pic.cols + xx]) << endl;
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
@@ -246,9 +240,7 @@ public:
 
 		svg << R"(<?xml version="1.0" encoding="utf-8"?>)" << endl
 			<< R"(<!-- Generator: pic2svg -->)" << endl
-			// << R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" << pic.cols << R"(" height=")" << pic.rows << R"(" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl
-			<< R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl
-			<< "<title>pic2svg</title>" << endl;
+			<< R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
 
 		for (auto &pointsArray : pointsArrayByColors)
 		{
