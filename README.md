@@ -10,6 +10,12 @@ Convert looks like this:
 
 ## How to build
 
+*	MacOS:
+	```
+	brew install opencv@3
+	brew link opencv@3 --force
+	```
+
 ```
 git clone https://github.com/YJBeetle/pic2svg.git
 cd pic2svg
