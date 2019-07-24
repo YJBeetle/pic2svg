@@ -44,7 +44,7 @@ public:
 	{
 		auto picRead = imread(path, IMREAD_UNCHANGED);
 		if (picRead.channels() == 3)
-			cvtColor(picRead, pic, CV_BGR2BGRA);
+			cvtColor(picRead, pic, COLOR_BGR2BGRA);
 		else
 		{
 			pic = picRead;
@@ -146,8 +146,8 @@ public:
 							mask[yy * pic.cols + xx] |= (1 << direction);
 
 							if (direction % 2 == 1)											  // 偶数为边，奇数为角
-								points.push_back({x : xx + pointAddByDirection2[direction].x, // 添加喵点
-												  y : yy + pointAddByDirection2[direction].y});
+								points.push_back({.x = xx + pointAddByDirection2[direction].x, // 添加喵点
+												  .y = yy + pointAddByDirection2[direction].y});
 
 							if (isSame(t, direction)) // direction方向上有相同色
 							{
