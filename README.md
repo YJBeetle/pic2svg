@@ -12,8 +12,8 @@ Convert looks like this:
 
 *	MacOS:
 	```
-	brew install opencv@3
-	brew link opencv@3 --force
+	brew install opencv
+	brew link opencv
 	```
 
 ```
