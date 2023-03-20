@@ -7,16 +7,7 @@
 #include <opencv2/opencv.hpp>
 #include <getopt.h>
 
-inline int8_t DirectionFixMax(int8_t d) { return d >= 8 ? d - 8 : d; }
-inline int8_t DirectionFixMin(int8_t d) { return d < 0 ? d + 8 : d; }
-inline int8_t DirectionFix(int8_t d)
-{
-	while (d >= 8)
-		d -= 8;
-	while (d < 0)
-		d += 8;
-	return d;
-}
+inline int8_t directionFix(int8_t d) { return d & 0b111; }
 inline bool isSame(uint8_t t, int8_t d) { return (t & (1 << d)) == (1 << d); }
 
 using namespace std;
@@ -149,13 +140,13 @@ public:
 							goto ignore;
 
 						// 确定搜索旋转方向
-						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
+						int8_t turnDirection = isSame(t, directionFix(lastDirection + 1)) ? -1 : 1;
 
 						for (int8_t forDirection = lastDirection + 1 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection;
 							 forDirection * turnDirection <= endDirection * turnDirection;
 							 forDirection += turnDirection) // 从决定的方向+1开始搜索下一个点 直到一圈结束
 						{
-							int8_t direction = DirectionFix(forDirection);
+							int8_t direction = directionFix(forDirection);
 
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
@@ -177,8 +168,8 @@ public:
 								if (direction % 2 == 1) // 偶数为边，奇数为角
 								{
 									// 当是奇数时
-									auto directionN = (direction + 1) & 0b111;																 // 上一个的方向序号
-									auto directionP = (direction - 1) & 0b111;																 // 下一个的方向序号
+									auto directionN = directionFix(direction + 1);															 // 上一个的方向序号
+									auto directionP = directionFix(direction - 1);															 // 下一个的方向序号
 									int xThis = xx + pointAddByDirection[direction].x;														 // 当前方向的外侧坐标X
 									int yThis = yy + pointAddByDirection[direction].y;														 // 当前方向的外侧坐标Y
 									int xNext = xx + pointAddByDirection[directionN].x;														 // 上一个方向的外侧坐标X
@@ -234,7 +225,7 @@ public:
 								// 下一个点坐标
 								xx += pointAddByDirection[direction].x;
 								yy += pointAddByDirection[direction].y;
-								lastDirection = DirectionFixMax(direction + 4);
+								lastDirection = directionFix(direction + 4);
 
 								goto nextPoint;
 							}
