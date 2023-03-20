@@ -284,11 +284,10 @@ public:
 
 			for (auto &points : pointsArray)
 			{
-				auto &point = points.front();
-				svg << "M" << point.x << "," << point.y;
-				points.pop_front();
-				for (auto &point : points)
-					svg << "L" << point.x << "," << point.y;
+				auto point = points.begin();
+				svg << "M" << point->x << "," << point->y, point++;
+				while (point != points.end())
+					svg << "L" << point->x << "," << point->y, point++;
 				svg << "Z ";
 			}
 
