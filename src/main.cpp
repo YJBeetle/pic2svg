@@ -90,17 +90,19 @@ public:
 	void saveToSvgByPixel(string svgPath)
 	{
 		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
+		unordered_map<uint32_t, size_t> colorsIndex;					  // 颜色映射到序号
 		vector<vector<uint8_t>> masks;									  // 每个颜色的标记数据
-		for (size_t ci = 0; ci < colors.rows; ci++)						  // 初始化masks
+		// 初始化
+		for (size_t ci = 0; ci < colors.rows; ci++)
+		{
+			colorsIndex.insert({colors.at<uint32_t>(ci, 0), ci});
 			masks.push_back(std::vector<uint8_t>(pic.cols * pic.rows));
+		}
 		// 遍历像素
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				int ci = -1;
-				for (int row = 0; row < colors.rows; row++)
-					if (colors.at<uint32_t>(row, 0) == pic.at<uint32_t>(y, x))
-						ci = row;
+				int ci = colorsIndex[pic.at<uint32_t>(y, x)];
 
 				if (
 					(pic.at<Vec4b>(y, x)[3]) &&									  // Aplha不为空
