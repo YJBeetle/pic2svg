@@ -282,7 +282,7 @@ public:
 
 			for (auto &points : pointsArray)
 			{
-				auto point = points.front();
+				auto &point = points.front();
 				svg << "M" << point.x << "," << point.y;
 				points.pop_front();
 				for (auto &point : points)
