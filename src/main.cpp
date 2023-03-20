@@ -71,6 +71,11 @@ public:
 		Mat centers;
 		kmeans(samples, colorQuantity, labels, TermCriteria(TermCriteria::COUNT | TermCriteria::EPS, 10000, 0.0001), 5 /* attempts */, KMEANS_PP_CENTERS, centers);
 
+		colors = Mat(centers.rows, 1, CV_8UC4);
+		for (int row = 0; row < centers.rows; row++)
+			for (int c = 0; c < 4; c++)
+				colors.at<Vec4b>(row, 0)[c] = centers.at<float>(row, c);
+
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
@@ -85,7 +90,14 @@ public:
 	void saveToSvgByPixel(string svgPath)
 	{
 		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
-		std::vector<uint8_t> mask(pic.cols * pic.rows);
+		unordered_map<uint32_t, vector<uint8_t>> masks;					  // 每个颜色的标记数据
+		// 初始化
+		for (int row = 0; row < colors.rows; row++)
+		{
+			uint32_t p = colors.at<uint32_t>(row, 0); // 像素颜色
+			pointsArrayByColors.insert({p, {}});
+			masks.insert({p, std::vector<uint8_t>(pic.cols * pic.rows)});
+		}
 		// 遍历像素
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
@@ -94,7 +106,7 @@ public:
 				if (
 					(p & 0xFF000000) &&							   // Aplha不为空
 					(y == 0 || p != pic.at<uint32_t>(y - 1, x)) && // 上方是边缘
-					(mask[y * pic.cols + x] & (1 << 6)) == 0	   // 且上方未被标记
+					(masks[p][y * pic.cols + x] & (1 << 6)) == 0   // 且这个颜色上方未被标记
 				)
 				{
 					// 找到一个起始点
@@ -143,7 +155,7 @@ public:
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
-							mask[yy * pic.cols + xx] |= (1 << direction);
+							masks[p][yy * pic.cols + xx] |= (1 << direction);
 
 							if (direction % 2 == 1)											   // 偶数为边，奇数为角
 								points.push_back({.x = xx + pointAddByDirection2[direction].x, // 添加喵点
@@ -290,6 +302,7 @@ public:
 
 private:
 	Mat pic;
+	Mat colors;
 
 	struct Point
 	{
