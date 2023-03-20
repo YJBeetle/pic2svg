@@ -24,7 +24,9 @@ using namespace cv;
 
 void help()
 {
-	cerr << "Usage: pic2svg picture_file [svg_file] [-c limit_color_quantity]" << '\n';
+	cerr << "Usage: pic2svg picture_file [svg_file] [-c limit_color_quantity] [-a]" << endl
+		 << "\t-c\tSet limit color quantity" << endl
+		 << "\t-a\tAdjacency or overlap (Default overlap)" << endl;
 	exit(1);
 }
 
@@ -87,7 +89,7 @@ public:
 			}
 	}
 
-	void saveToSvgByPixel(string svgPath)
+	void saveToSvgByPixel(string svgPath, bool adjacencyMode = false)
 	{
 		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
 		unordered_map<uint32_t, size_t> colorsIndex;					  // 颜色映射到序号
@@ -102,7 +104,7 @@ public:
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				int ci = colorsIndex[pic.at<uint32_t>(y, x)];
+				int ci = colorsIndex[pic.at<uint32_t>(y, x)]; // 当前颜色序号
 
 				if (
 					(pic.at<Vec4b>(y, x)[3]) &&									  // Aplha不为空
@@ -160,9 +162,72 @@ public:
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
 							masks[ci][yy * pic.cols + xx] |= (1 << direction);
 
-							if (direction % 2 == 1)											   // 偶数为边，奇数为角
-								points.push_back({.x = xx + pointAddByDirection2[direction].x, // 添加喵点
-												  .y = yy + pointAddByDirection2[direction].y});
+							if (adjacencyMode)
+							{
+								if (direction % 2 == 1) // 偶数为边，奇数为角
+								{
+									// 当是奇数时
+									const Point pointABD[8] = {{NAN, NAN}, {1, 1}, {NAN, NAN}, {0, 1}, {NAN, NAN}, {0, 0}, {NAN, NAN}, {1, 0}};
+									points.push_back({.x = xx + pointABD[direction].x,
+													  .y = yy + pointABD[direction].y});
+								}
+							}
+							else
+							{
+								if (direction % 2 == 1) // 偶数为边，奇数为角
+								{
+									// 当是奇数时
+									auto directionN = (direction + 1) & 0b111;																 // 上一个的方向序号
+									auto directionP = (direction - 1) & 0b111;																 // 下一个的方向序号
+									int xThis = xx + pointAddByDirection[direction].x;														 // 当前方向的外侧坐标X
+									int yThis = yy + pointAddByDirection[direction].y;														 // 当前方向的外侧坐标Y
+									int xNext = xx + pointAddByDirection[directionN].x;														 // 上一个方向的外侧坐标X
+									int yNext = yy + pointAddByDirection[directionN].y;														 // 上一个方向的外侧坐标Y
+									int xPrev = xx + pointAddByDirection[directionP].x;														 // 下一个方向的外侧坐标X
+									int yPrev = yy + pointAddByDirection[directionP].y;														 // 下一个方向的外侧坐标Y
+									auto lThis = pic.at<Vec4b>(yThis, xThis)[3] == 0xff && colorsIndex[pic.at<uint32_t>(yThis, xThis)] > ci; // 当前方向不透明且压住
+									auto lNext = pic.at<Vec4b>(yNext, xNext)[3] == 0xff && colorsIndex[pic.at<uint32_t>(yNext, xNext)] > ci; // 上一个方向不透明且压住
+									auto lPrev = pic.at<Vec4b>(yPrev, xPrev)[3] == 0xff && colorsIndex[pic.at<uint32_t>(yPrev, xPrev)] > ci; // 下一个方向不透明且压住
+
+									if (lThis == true && lNext == true && lPrev == true)
+									{
+										const Point pointABD[8] = {{NAN, NAN}, {1.5, 1.5}, {NAN, NAN}, {-0.5, 1.5}, {NAN, NAN}, {-0.5, -0.5}, {NAN, NAN}, {1.5, -0.5}};
+										points.push_back({.x = xx + pointABD[direction].x,
+														  .y = yy + pointABD[direction].y});
+									}
+									else if (lThis == true && lNext == false && lPrev == true)
+									{
+										const Point pointABD[8] = {{NAN, NAN}, {1.5, 1}, {NAN, NAN}, {0, 1.5}, {NAN, NAN}, {-0.5, 0}, {NAN, NAN}, {1, -0.5}};
+										points.push_back({.x = xx + pointABD[direction].x,
+														  .y = yy + pointABD[direction].y});
+									}
+									else if (lThis == true && lNext == true && lPrev == false)
+									{
+										const Point pointABD[8] = {{NAN, NAN}, {1, 1.5}, {NAN, NAN}, {-0.5, 1}, {NAN, NAN}, {0, -0.5}, {NAN, NAN}, {1.5, 0}};
+										points.push_back({.x = xx + pointABD[direction].x,
+														  .y = yy + pointABD[direction].y});
+									}
+									else
+									{
+										const Point pointABD[8] = {{NAN, NAN}, {1, 1}, {NAN, NAN}, {0, 1}, {NAN, NAN}, {0, 0}, {NAN, NAN}, {1, 0}};
+										points.push_back({.x = xx + pointABD[direction].x,
+														  .y = yy + pointABD[direction].y});
+									}
+								}
+								else
+								{
+									// 当是偶数时
+									int xThis = xx + pointAddByDirection[direction].x;	  // 当前方向的外侧坐标
+									int yThis = yy + pointAddByDirection[direction].y;	  // 当前方向的外侧坐标
+									if (pic.at<Vec4b>(yThis, xThis)[3] == 0xff &&		  // 若相邻的是不透明的
+										colorsIndex[pic.at<uint32_t>(yThis, xThis)] > ci) // 且被相邻颜色压住的
+									{
+										const Point pointABD[8] = {{1.5, 0.5}, {NAN, NAN}, {0.5, 1.5}, {NAN, NAN}, {-0.5, 0.5}, {NAN, NAN}, {0.5, -0.5}, {NAN, NAN}};
+										points.push_back({.x = xx + pointABD[direction].x,
+														  .y = yy + pointABD[direction].y});
+									}
+								}
+							}
 
 							if (isSame(t, direction)) // direction方向上有相同色
 							{
@@ -309,8 +374,8 @@ private:
 
 	struct Point
 	{
-		int x;
-		int y;
+		float x;
+		float y;
 	};
 	const Point pointAddByDirection[8] = {
 		{1, 0},
@@ -322,16 +387,6 @@ private:
 		{0, -1},
 		{1, -1},
 	}; // 打表
-	const Point pointAddByDirection2[8] = {
-		{1, 1},
-		{1, 1},
-		{0, 1},
-		{0, 1},
-		{0, 0},
-		{0, 0},
-		{1, 0},
-		{1, 0},
-	}; // 打表
 };
 
 int main(int argC, char **argV)
@@ -339,13 +394,17 @@ int main(int argC, char **argV)
 	string picPath;
 	string svgPath;
 	int limitColorQuantity = 32;
+	bool adjacencyMode = false;
 
 	int ch;
-	while ((ch = getopt(argC, argV, "c:")) != -1)
+	while ((ch = getopt(argC, argV, "c:a")) != -1)
 		switch (ch)
 		{
 		case 'c':
 			limitColorQuantity = stoi(optarg);
+			break;
+		case 'a':
+			adjacencyMode = true;
 			break;
 		case '?':
 		default:
@@ -370,6 +429,7 @@ int main(int argC, char **argV)
 		 << "pic: " << picPath << endl
 		 << "svg: " << svgPath << endl
 		 << "limitColorQuantity: " << limitColorQuantity << endl
+		 << "adjacencyMode: " << (adjacencyMode ? "on" : "off") << endl
 		 << "==========" << endl;
 
 	SvgMake svgMake;
@@ -387,5 +447,5 @@ int main(int argC, char **argV)
 #endif
 
 	cout << "saveToSvgByPixel..." << endl;
-	svgMake.saveToSvgByPixel(svgPath);
+	svgMake.saveToSvgByPixel(svgPath, adjacencyMode);
 }
