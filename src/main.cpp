@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <memory>
 #include <unordered_map>
 #include <list>
 #include <vector>
@@ -86,7 +85,7 @@ public:
 	void saveToSvgByPixel(string svgPath)
 	{
 		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
-		unique_ptr<uint8_t[]> mask(new uint8_t[pic.cols * pic.rows]{});	  // 标记数据
+		std::vector<uint8_t> mask(pic.cols * pic.rows);
 		// 遍历像素
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
@@ -102,7 +101,7 @@ public:
 					int xx = x;
 					int yy = y;
 					list<Point> points;
-					unique_ptr<uint8_t[]> maskNow(new uint8_t[pic.cols * pic.rows]{});
+					std::vector<uint8_t> maskNow(pic.cols * pic.rows);
 
 					int8_t lastDirection = 5; // 起始方向
 
