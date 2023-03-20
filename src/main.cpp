@@ -105,7 +105,7 @@ public:
 
 					int8_t lastDirection = 5; // 起始方向
 
-					//开始搜索附近点
+					// 开始搜索附近点
 					while (1)
 					{
 						/*
@@ -145,7 +145,7 @@ public:
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
 							mask[yy * pic.cols + xx] |= (1 << direction);
 
-							if (direction % 2 == 1)											  // 偶数为边，奇数为角
+							if (direction % 2 == 1)											   // 偶数为边，奇数为角
 								points.push_back({.x = xx + pointAddByDirection2[direction].x, // 添加喵点
 												  .y = yy + pointAddByDirection2[direction].y});
 
@@ -174,7 +174,7 @@ public:
 				}
 			}
 
-		//删除直线上的不需要的点
+		// 删除直线上的不需要的点
 		for (auto &pointsArray : pointsArrayByColors)
 		{
 			for (auto &points : pointsArray.second)
@@ -209,7 +209,7 @@ public:
 					Point lastlast = points.front();
 					Point last = *(++points.cbegin());
 					Point now = {-1, -1};
-					for (auto point = ++++points.cbegin(); point != points.cend(); point++)
+					for (auto point = ++ ++points.cbegin(); point != points.cend(); point++)
 					{
 						now = *point;
 						if ((now.x * last.y - now.y * last.x) + (last.x * lastlast.y - last.y * lastlast.x) + (lastlast.x * now.y - lastlast.y * now.x) == 0) // 三点一线
