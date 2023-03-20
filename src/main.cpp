@@ -149,7 +149,9 @@ public:
 						// 确定搜索旋转方向
 						int8_t turnDirection = isSame(t, DirectionFixMax(lastDirection + 1)) ? -1 : 1;
 
-						for (int8_t forDirection = lastDirection + 1 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection; forDirection * turnDirection <= endDirection * turnDirection; forDirection += turnDirection) // 从决定的方向+1开始搜索下一个点 直到一圈结束
+						for (int8_t forDirection = lastDirection + 1 * turnDirection, endDirection = lastDirection + (8 + 1) * turnDirection;
+							 forDirection * turnDirection <= endDirection * turnDirection;
+							 forDirection += turnDirection) // 从决定的方向+1开始搜索下一个点 直到一圈结束
 						{
 							int8_t direction = DirectionFix(forDirection);
 
