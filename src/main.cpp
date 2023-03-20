@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <list>
 #include <vector>
 #include <opencv2/opencv.hpp>
@@ -54,6 +55,15 @@ public:
 
 	void limitColor(int colorQuantity)
 	{
+		// 统计原图色彩数量
+		unordered_set<uint32_t> colorsSet;
+		for (int y = 0; y < pic.rows; y++)
+			for (int x = 0; x < pic.cols; x++)
+				colorsSet.insert(pic.at<uint32_t>(y, x));
+		if (colorQuantity > colorsSet.size())
+			colorQuantity = colorsSet.size();
+
+		// 图像重新采样
 		Mat samples(pic.rows * pic.cols, 4, CV_32F);
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
