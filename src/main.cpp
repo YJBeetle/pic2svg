@@ -90,23 +90,22 @@ public:
 	void saveToSvgByPixel(string svgPath)
 	{
 		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
-		unordered_map<uint32_t, vector<uint8_t>> masks;					  // 每个颜色的标记数据
-		// 初始化
-		for (int row = 0; row < colors.rows; row++)
-		{
-			uint32_t p = colors.at<uint32_t>(row, 0); // 像素颜色
-			pointsArrayByColors.insert({p, {}});
-			masks.insert({p, std::vector<uint8_t>(pic.cols * pic.rows)});
-		}
+		vector<vector<uint8_t>> masks;									  // 每个颜色的标记数据
+		for (size_t ci = 0; ci < colors.rows; ci++)						  // 初始化masks
+			masks.push_back(std::vector<uint8_t>(pic.cols * pic.rows));
 		// 遍历像素
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				uint32_t p = pic.at<uint32_t>(y, x); // 像素颜色
+				int ci = -1;
+				for (int row = 0; row < colors.rows; row++)
+					if (colors.at<uint32_t>(row, 0) == pic.at<uint32_t>(y, x))
+						ci = row;
+
 				if (
-					(p & 0xFF000000) &&							   // Aplha不为空
-					(y == 0 || p != pic.at<uint32_t>(y - 1, x)) && // 上方是边缘
-					(masks[p][y * pic.cols + x] & (1 << 6)) == 0   // 且这个颜色上方未被标记
+					(pic.at<Vec4b>(y, x)[3]) &&									  // Aplha不为空
+					(y == 0 || pic.at<Vec4b>(y, x) != pic.at<Vec4b>(y - 1, x)) && // 上方是边缘
+					(masks[ci][y * pic.cols + x] & (1 << 6)) == 0				  // 且这个颜色上方未被标记
 				)
 				{
 					// 找到一个起始点
@@ -155,7 +154,7 @@ public:
 							if (isSame(maskNow[yy * pic.cols + xx], direction)) // 遇到了起点
 								goto closure;
 							maskNow[yy * pic.cols + xx] |= (1 << direction);
-							masks[p][yy * pic.cols + xx] |= (1 << direction);
+							masks[ci][yy * pic.cols + xx] |= (1 << direction);
 
 							if (direction % 2 == 1)											   // 偶数为边，奇数为角
 								points.push_back({.x = xx + pointAddByDirection2[direction].x, // 添加喵点
@@ -180,7 +179,7 @@ public:
 				closure:
 					// 闭合
 					if (points.size())
-						pointsArrayByColors[p].push_back(std::move(points));
+						pointsArrayByColors[pic.at<uint32_t>(y, x)].push_back(std::move(points));
 
 				ignore:;
 				}
@@ -260,15 +259,16 @@ public:
 			<< R"(<!-- Generator: pic2svg -->)" << endl
 			<< R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 )" << pic.cols << ' ' << pic.rows << R"(">)" << endl;
 
-		for (auto &pointsArray : pointsArrayByColors)
+		for (size_t ci = 0; ci < colors.rows; ci++)
 		{
-			uint32_t p = pointsArray.first;
-			color[0] = (p & 0xF00000) >> 20;
-			color[1] = (p & 0x0F0000) >> 16;
-			color[2] = (p & 0x00F000) >> 12;
-			color[3] = (p & 0x000F00) >> 8;
-			color[4] = (p & 0x0000F0) >> 4;
-			color[5] = (p & 0x00000F) >> 0;
+			auto c = colors.at<uint32_t>(ci, 0);
+			auto &pointsArray = pointsArrayByColors[c];
+			color[0] = (c & 0xF00000) >> 20;
+			color[1] = (c & 0x0F0000) >> 16;
+			color[2] = (c & 0x00F000) >> 12;
+			color[3] = (c & 0x000F00) >> 8;
+			color[4] = (c & 0x0000F0) >> 4;
+			color[5] = (c & 0x00000F) >> 0;
 			color[0] = color[0] < 0xA ? color[0] + '0' : color[0] - 0xA + 'A';
 			color[1] = color[1] < 0xA ? color[1] + '0' : color[1] - 0xA + 'A';
 			color[2] = color[2] < 0xA ? color[2] + '0' : color[2] - 0xA + 'A';
@@ -278,7 +278,7 @@ public:
 
 			svg << "<path d=\"";
 
-			for (auto &points : pointsArray.second)
+			for (auto &points : pointsArray)
 			{
 				auto point = points.front();
 				svg << "M" << point.x << "," << point.y;
@@ -290,8 +290,8 @@ public:
 
 			svg << "\"";
 			svg << " fill=\"#" << color << "\"";
-			if ((p >> 24) != 0xFF)
-				svg << " opacity=\"" << (float)(p >> 24) / 0xFF << "\"";
+			if ((c >> 24) != 0xFF)
+				svg << " opacity=\"" << (float)(c >> 24) / 0xFF << "\"";
 			svg << "/>" << endl;
 		}
 
