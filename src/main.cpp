@@ -85,16 +85,17 @@ public:
 
 	void saveToSvgByPixel(string svgPath)
 	{
-		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors;
-		unique_ptr<uint8_t[]> mask(new uint8_t[pic.cols * pic.rows]{});
+		unordered_map<uint32_t, vector<list<Point>>> pointsArrayByColors; // 每个颜色的点数据
+		unique_ptr<uint8_t[]> mask(new uint8_t[pic.cols * pic.rows]{});	  // 标记数据
+		// 遍历像素
 		for (int y = 0; y < pic.rows; y++)
 			for (int x = 0; x < pic.cols; x++)
 			{
-				uint32_t p = pic.at<uint32_t>(y, x);
+				uint32_t p = pic.at<uint32_t>(y, x); // 像素颜色
 				if (
 					(p & 0xFF000000) &&							   // Aplha不为空
 					(y == 0 || p != pic.at<uint32_t>(y - 1, x)) && // 上方是边缘
-					(mask[y * pic.cols + x] & (1 << 6)) == 0	   // 且未标记
+					(mask[y * pic.cols + x] & (1 << 6)) == 0	   // 且上方未被标记
 				)
 				{
 					// 找到一个起始点
@@ -110,7 +111,7 @@ public:
 					{
 						/*
 							  7      0
-							  ⬇      ⬇
+							  ↓      ↓
 							0b00000000
 							 ___________
 							| 5 | 6 | 7 |
@@ -166,7 +167,7 @@ public:
 					}
 
 				closure:
-
+					// 闭合
 					if (points.size())
 						pointsArrayByColors[p].push_back(std::move(points));
 
