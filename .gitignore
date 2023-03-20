@@ -6,3 +6,5 @@ CMakeLists.txt.user
 /.vscode
 /build
 
+/.idea/
+/cmake-build-debug/
