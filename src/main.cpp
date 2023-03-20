@@ -25,7 +25,7 @@ using namespace cv;
 
 void help()
 {
-	cerr << "Usage: pic2svg <PICTURE_FILE> <SVG_FILE>" << '\n';
+	cerr << "Usage: pic2svg picture_file [svg_file] [-c limit_color_quantity]" << '\n';
 	exit(1);
 }
 
